@@ -1,0 +1,21 @@
+#!/bin/sh
+ 
+# Shell script to sign BIND9 zone file with DNSSEC certificates
+# place this into /usr/sbin/zonesigner.sh
+# remember to chmod +x /usr/sbin/zonesigner.sh
+# usage: zonesigner.sh domain.com  /var/named/zone.domain.com
+ 
+# Run monthly using cron: 0 0 1 * * /usr/sbin/zonesigner.sh domain.com /var/named/zone.domain.com
+# running a new signature monthly is needed, because RRSIGs expire in 30 days (at least to my knowlege)
+ 
+PDIR=`pwd`
+ZONEDIR="/var/named" # BIND9 root location
+ZONE=$1
+ZONEFILE=$2
+DNSSERVICE="named"
+cd $ZONEDIR
+SERIAL=`/usr/sbin/named-checkzone $ZONE $ZONEFILE | egrep -ho '[0-9]{10}'`
+sed -i 's/'$SERIAL'/'$(($SERIAL+1))'/' $ZONEFILE
+/usr/sbin/dnssec-signzone -A -3 $(head -c 1000 /dev/random | sha1sum | cut -b 1-16) -N increment -o $1 -t $2
+/bin/systemctl restart $DNSSERVICE
+cd $PDIR
